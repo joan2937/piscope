@@ -23,6 +23,7 @@ On the Pi (with the display on a remote machine)
 ------------------------------------------------
 
 remote_host ~ $ ssh -X pi_host
+
 pi_host ~ $ piscope
 
 Pi captures data, Pi processes data, remote displays data
@@ -31,6 +32,7 @@ On a remote machine
 -------------------
 
 remote_host ~ $ export PIGPIO_ADDR=pi_host
+
 remote_host ~ $ piscope
 
 Pi captures data, remote processes data, remote displays data
