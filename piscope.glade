@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated with glade 3.18.3 -->
 <interface>
-  <!-- interface-requires gtk+ 3.0 -->
+  <requires lib="gtk+" version="3.0"/>
+  <object class="GtkEntryCompletion" id="entrycompletion1"/>
   <object class="GtkDialog" id="gCmdsDialog">
     <property name="can_focus">False</property>
     <property name="border_width">5</property>
@@ -1070,23 +1072,33 @@
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <child>
-                          <object class="GtkImageMenuItem" id="main_menu_file_open">
-                            <property name="label">gtk-open</property>
+                          <object class="GtkMenuItem" id="main_menu_file_restore">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
+                            <property name="tooltip_text" translatable="yes">Restores piscope samples saved during a prior session</property>
+                            <property name="label" translatable="yes">Restore Saved Samples</property>
                             <property name="use_underline">True</property>
-                            <property name="use_stock">True</property>
-                            <signal name="activate" handler="main_menu_file_open_activate" swapped="no"/>
+                            <signal name="activate" handler="main_menu_file_restore_activate" swapped="no"/>
                           </object>
                         </child>
                         <child>
-                          <object class="GtkImageMenuItem" id="main_menu_file_save">
-                            <property name="label">gtk-save</property>
+                          <object class="GtkMenuItem" id="main_menu_file_save_all">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
+                            <property name="tooltip_text" translatable="yes">Saves all the captured samples as a piscope or VCD file</property>
+                            <property name="label" translatable="yes">Save All Samples</property>
                             <property name="use_underline">True</property>
-                            <property name="use_stock">True</property>
-                            <signal name="activate" handler="main_menu_file_save_activate" swapped="no"/>
+                            <signal name="activate" handler="main_menu_file_save_all_activate" swapped="no"/>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkMenuItem" id="main_menu_file_save_selection">
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                            <property name="tooltip_text" translatable="yes">Saves all the captured samples between the green (1) and red (2) markers as a piscope or VCD file</property>
+                            <property name="label" translatable="yes">Save Selected Samples</property>
+                            <property name="use_underline">True</property>
+                            <signal name="activate" handler="main_menu_file_save_selection_activate" swapped="no"/>
                           </object>
                         </child>
                         <child>
@@ -1100,6 +1112,7 @@
                             <property name="label">gtk-quit</property>
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
+                            <property name="tooltip_text" translatable="yes">Quit piscope</property>
                             <property name="use_underline">True</property>
                             <property name="use_stock">True</property>
                             <signal name="activate" handler="main_menu_file_quit_activate" swapped="no"/>
@@ -1123,6 +1136,7 @@
                           <object class="GtkMenuItem" id="main_menu_misc_gpios">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
+                            <property name="tooltip_text" translatable="yes">Select the gpios to monitor</property>
                             <property name="label" translatable="yes">GPIOs</property>
                             <property name="use_underline">True</property>
                             <signal name="activate" handler="main_menu_misc_gpios_activate" swapped="no"/>
@@ -1132,6 +1146,7 @@
                           <object class="GtkMenuItem" id="main_menu_misc_triggers">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
+                            <property name="tooltip_text" translatable="yes">Select a pattern of gpio edges for a trigger</property>
                             <property name="label" translatable="yes">Triggers</property>
                             <property name="use_underline">True</property>
                             <signal name="activate" handler="main_menu_misc_triggers_activate" swapped="no"/>
@@ -1501,6 +1516,7 @@
                 <signal name="draw" handler="main_vleg_draw" swapped="no"/>
                 <signal name="button-press-event" handler="main_vleg_button_press_event" swapped="no"/>
                 <signal name="configure-event" handler="main_vleg_configure_event" swapped="no"/>
+                <signal name="draw" handler="main_vleg_draw" swapped="no"/>
               </object>
               <packing>
                 <property name="left_attach">0</property>
@@ -1520,6 +1536,7 @@
                 <signal name="draw" handler="main_osc_draw" swapped="no"/>
                 <signal name="button-press-event" handler="main_osc_button_press_event" swapped="no"/>
                 <signal name="configure-event" handler="main_osc_configure_event" swapped="no"/>
+                <signal name="draw" handler="main_osc_draw" swapped="no"/>
                 <signal name="motion-notify-event" handler="main_osc_motion_notify_event" swapped="no"/>
               </object>
               <packing>
@@ -1542,6 +1559,7 @@
                     <property name="hexpand">True</property>
                     <signal name="draw" handler="main_hleg_draw" swapped="no"/>
                     <signal name="configure-event" handler="main_hleg_configure_event" swapped="no"/>
+                    <signal name="draw" handler="main_hleg_draw" swapped="no"/>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -1563,6 +1581,7 @@
                 <property name="can_focus">False</property>
                 <signal name="draw" handler="main_mode_draw" swapped="no"/>
                 <signal name="configure-event" handler="main_mode_configure_event" swapped="no"/>
+                <signal name="draw" handler="main_mode_draw" swapped="no"/>
               </object>
               <packing>
                 <property name="left_attach">0</property>
@@ -1591,6 +1610,7 @@
                 <signal name="draw" handler="main_samp_draw" swapped="no"/>
                 <signal name="button-press-event" handler="main_samp_button_press_event" swapped="no"/>
                 <signal name="configure-event" handler="main_samp_configure_event" swapped="no"/>
+                <signal name="draw" handler="main_samp_draw" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>

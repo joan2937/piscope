@@ -49,7 +49,7 @@ export PIGPIO_ADDR=192.168.1.67 # specify by IP address
 
 */
 
-#define PISCOPE_VERSION "0.5"
+#define PISCOPE_VERSION "0.6"
 
 #include <gtk/gtk.h>
 
@@ -196,6 +196,8 @@ static int32_t        gPlaySpeed = PISCOPE_DEF_SPEED_IDX;
 static struct timeval gTimeOrigin;
 static int64_t        gTickOrigin;
 
+static int64_t        g1Tick;
+static int64_t        g2Tick;
 static int64_t        gGoldTick;
 static int64_t        gBlueTick;
 
@@ -359,6 +361,13 @@ static cairo_surface_t  *gCmodeSurface    = NULL;
 
 static cairo_t          *gCoscCairo = NULL;
 
+gboolean main_osc_configure_event
+(
+   GtkWidget         *widget,
+   GdkEventConfigure *event,
+   gpointer           data
+);
+
 /* FUNCTIONS -------------------------------------------------------------- */
 
 
@@ -458,6 +467,8 @@ static void util_vlegConfigure(GtkWidget *widget)
    cairo_t *cr;
    int i;
    char buf[16];
+
+   if (!gtk_widget_get_window(widget)) return;
 
    if (gCvlegSurface) cairo_surface_destroy(gCvlegSurface);
 
@@ -631,6 +642,7 @@ static void util_calcGpioY(void)
    }
 
    util_vlegConfigure(gMainCvleg);
+
    gtk_widget_queue_draw(gMainCvleg);
 
    util_hlegConfigure(gMainChleg);
@@ -696,7 +708,7 @@ static int util_popupMessage(int type, int buttons, const gchar * format, ...)
 
    dialog = gtk_message_dialog_new
    (
-      NULL,
+      GTK_WINDOW(gMain),
       GTK_DIALOG_DESTROY_WITH_PARENT,
       type,
       buttons,
@@ -1029,6 +1041,15 @@ void cmds_emptybuf_clicked(GtkButton * button, gpointer user_data)
       gBufWritePos = -1;
       gBufReadPos  =  0;
       gBufSamples  =  0;
+
+      gBlueTick = 0;
+      gGoldTick = 0;
+      g1Tick = 0;
+      g2Tick = 0;
+
+      gTickOrigin = 0;
+
+      main_osc_configure_event(gMainCosc, NULL, NULL);
    }
 }
 
@@ -1047,7 +1068,7 @@ static int file_VCDsymbol(int bit)
    else          return ('a' + bit - 26);
 }
 
-static int file_load(char * filename)
+static int file_load(char *filename)
 {
    uint32_t level;
    int64_t tick64;
@@ -1126,7 +1147,7 @@ static int file_load(char * filename)
    return 0;
 }
 
-static int file_save(int filetype, char * filename)
+static int file_save(int filetype, char *filename, int selection)
 {
    int b, r, p, v;
    uint32_t lastLevel, changed, level;
@@ -1161,36 +1182,40 @@ static int file_save(int filetype, char * filename)
 
    for (r=0; r<gBufSamples; r++)
    {
-      if (filetype == piscope_vcd)
+      if (!selection ||
+        ((gSampleTick[p] >= g1Tick) && (gSampleTick[p] <= g2Tick)))
       {
-         fprintf(out, "#%Ld\n",
-            (long long int)(gSampleTick[p]-gTickOrigin));
-
-         level = gSampleLevel[p];
-
-         changed = level ^ lastLevel;
-
-         for (b=0; b<32; b++)
+         if (filetype == piscope_vcd)
          {
-            if (changed & (1<<b))
+            fprintf(out, "#%Ld\n",
+               (long long int)(gSampleTick[p]-gTickOrigin));
+
+            level = gSampleLevel[p];
+
+            changed = level ^ lastLevel;
+
+            for (b=0; b<32; b++)
             {
-               if (level & (1<<b)) v='1'; else v='0';
+               if (changed & (1<<b))
+               {
+                  if (level & (1<<b)) v='1'; else v='0';
 
-               fprintf(out, "%c%c\n", v, file_VCDsymbol(b));
+                  fprintf(out, "%c%c\n", v, file_VCDsymbol(b));
+               }
             }
-         }
 
-         lastLevel = gSampleLevel[p];
-      }
-      else
-      {
-         fprintf
-         (
-            out,
-            "%Ld %08X\n",
-            (long long int)(gSampleTick[p]-gTickOrigin),
-            gSampleLevel[p]
-         );
+            lastLevel = gSampleLevel[p];
+         }
+         else
+         {
+            fprintf
+            (
+               out,
+               "%Ld %08X\n",
+               (long long int)(gSampleTick[p]-gTickOrigin),
+               gSampleLevel[p]
+            );
+         }
       }
 
       if (++p >= PISCOPE_SAMPLES) p = 0;
@@ -1940,6 +1965,52 @@ static int main_util_bsearch(int s1, int s2, int64_t *tick)
 }
 
 
+static void main_util_1Tick(void)
+{
+   int64_t x, diffTick;
+
+   if ((g1Tick > gViewStartTick) && (g1Tick < gViewEndTick))
+   {
+      cairo_set_line_width(gCoscCairo, 1.0);
+
+      cairo_set_source_rgb(gCoscCairo, 0.3, 1.0, 0.3);
+
+      diffTick = g1Tick - gViewStartTick;
+
+      x = (int64_t)10 * diffTick / (int64_t)gDeciMicroPerPix;
+
+      cairo_move_to(gCoscCairo, x, 0);
+
+      cairo_line_to(gCoscCairo, x, gCoscHeight);
+
+      cairo_stroke(gCoscCairo);
+   }
+}
+
+
+static void main_util_2Tick(void)
+{
+   int64_t x, diffTick;
+
+   if ((g2Tick > gViewStartTick) && (g2Tick < gViewEndTick))
+   {
+      cairo_set_line_width(gCoscCairo, 1.0);
+
+      cairo_set_source_rgb(gCoscCairo, 1.0, 0.3, 0.3);
+
+      diffTick = g2Tick - gViewStartTick;
+
+      x = (int64_t)10 * diffTick / (int64_t)gDeciMicroPerPix;
+
+      cairo_move_to(gCoscCairo, x, 0);
+
+      cairo_line_to(gCoscCairo, x, gCoscHeight);
+
+      cairo_stroke(gCoscCairo);
+   }
+}
+
+
 static void main_util_GoldTick(void)
 {
    int64_t x, diffTick;
@@ -1975,7 +2046,7 @@ static void main_util_BlueTick(void)
 
       diffTick = gBlueTick - gViewStartTick;
 
-      x = (10 * diffTick) / gDeciMicroPerPix;
+      x = (int64_t)(10 * diffTick) / (int64_t)gDeciMicroPerPix;
 
       cairo_move_to(gCoscCairo, x, 0);
 
@@ -2103,6 +2174,10 @@ static void main_util_display(void)
 
    main_util_BlueTick();
 
+   main_util_1Tick();
+
+   main_util_2Tick();
+
    /* redraw screen */
 
    gtk_widget_queue_draw(gMainCosc);
@@ -2163,9 +2238,17 @@ static gboolean main_util_output(gpointer data)
    int decimals, blue;
    char buf[128];
 
-   if      (gOutputState == piscope_initialise) gOutputState = piscope_running;
-   else if (gOutputState == piscope_quit)       {gtk_main_quit(); return FALSE;}
-   else if (gOutputState == piscope_dormant)    return TRUE;
+   if (gOutputState == piscope_initialise)
+      gOutputState = piscope_running;
+
+   else if (gOutputState == piscope_quit)
+   {
+      gtk_main_quit();
+      return FALSE;
+   }
+
+   else if (gOutputState == piscope_dormant)
+      return TRUE;
 
    /* don't start display until data has arrived */
 
@@ -2540,7 +2623,8 @@ void main_destroy(void)
    if (gPigNotify >= 0) close(gPigNotify);
 }
 
-void main_menu_file_open_activate(GtkMenuItem *menuitem, gpointer user_data)
+void main_menu_file_restore_activate
+   (GtkMenuItem *menuitem, gpointer user_data)
 {
    GtkWidget *dialog;
    char *filename;
@@ -2553,8 +2637,8 @@ void main_menu_file_open_activate(GtkMenuItem *menuitem, gpointer user_data)
 
    dialog = gtk_file_chooser_dialog_new
    (
-      "Open File",
-       NULL,
+      "Restore Saved Samples",
+       GTK_WINDOW(gMain),
        GTK_FILE_CHOOSER_ACTION_OPEN,
        MY_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
        MY_STOCK_OPEN,   GTK_RESPONSE_ACCEPT,
@@ -2576,13 +2660,17 @@ void main_menu_file_open_activate(GtkMenuItem *menuitem, gpointer user_data)
    gtk_widget_destroy(dialog);
 }
 
-void main_menu_file_save_activate(GtkMenuItem *menuitem, gpointer user_data)
+void main_menu_file_save(GtkMenuItem *menuitem, int selection)
 {
    GtkWidget *dialog;
    char *filename;
-   gchar *concat;
    GtkFileFilter *vcd, *txt;
-   int textfile, addext;
+   int textfile;
+   char *title1 = "Save All Samples";
+   char *title2 = "Save Selected Samples";
+   char *title;
+
+   if (selection) title = title2; else title = title1;
 
    txt = gtk_file_filter_new();
    gtk_file_filter_set_name(txt, "TEXT");
@@ -2590,12 +2678,12 @@ void main_menu_file_save_activate(GtkMenuItem *menuitem, gpointer user_data)
 
    vcd = gtk_file_filter_new();
    gtk_file_filter_set_name(vcd, "VCD");
-   gtk_file_filter_add_pattern(vcd, "*.[vV][cC][dD]");
+   gtk_file_filter_add_mime_type(txt, "text/plain");
 
    dialog = gtk_file_chooser_dialog_new
    (
-      "Save File",
-      NULL,
+      title,
+      GTK_WINDOW(gMain),
       GTK_FILE_CHOOSER_ACTION_SAVE,
       MY_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
       MY_STOCK_SAVE,   GTK_RESPONSE_ACCEPT,
@@ -2613,65 +2701,43 @@ void main_menu_file_save_activate(GtkMenuItem *menuitem, gpointer user_data)
       filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
 
       if (gtk_file_chooser_get_filter(GTK_FILE_CHOOSER(dialog)) == vcd)
-      {
          textfile = 0;
-         addext   = 1;
-      }
       else
-      {
          textfile = 1;
-         addext   = 1;
-      }
 
       if (strlen(filename) > 3)
       {
          if (strcasecmp(".vcd", filename + strlen(filename) - 4) == 0)
-         {
             textfile = 0;
-            addext = 0;
-         }
       }
      
       if (strlen(filename) > 7)
       {
          if (strcasecmp(".piscope", filename + strlen(filename) - 8) == 0)
-         {
             textfile = 1;
-            addext = 0;
-         }
       }
      
       if (textfile)
-      {
-         if (addext)
-         {
-            concat = g_strconcat(filename, ".piscope", NULL);
-            file_save(piscope_text, concat);
-            g_free(concat);
-         }
-         else
-         {
-            file_save(piscope_text, filename);
-         }
-      }
+         file_save(piscope_text, filename, selection);
       else
-      {
-         if (addext)
-         {
-            concat = g_strconcat(filename, ".vcd", NULL);
-            file_save(piscope_vcd, concat);
-            g_free(concat);
-         }
-         else
-         {
-            file_save(piscope_vcd, filename);
-         }
-      }
+         file_save(piscope_vcd, filename, selection);
 
       g_free(filename);
    }
 
    gtk_widget_destroy(dialog);
+}
+
+void main_menu_file_save_all_activate
+   (GtkMenuItem *menuitem, gpointer user_data)
+{
+   main_menu_file_save(menuitem, 0);
+}
+
+void main_menu_file_save_selection_activate
+   (GtkMenuItem *menuitem, gpointer user_data)
+{
+   main_menu_file_save(menuitem, 1);
 }
 
 void main_menu_file_quit_activate(GtkMenuItem *menuitem, gpointer user_data)
@@ -2709,7 +2775,7 @@ void main_menu_help_about_activate
 {
    gtk_show_about_dialog
    (
-      NULL,
+      GTK_WINDOW(gMain),
       "program-name", "piscope",
       "title", "About piscope",
       "version", PISCOPE_VERSION,
@@ -2905,7 +2971,7 @@ void main_vleg_configure_event
    gpointer           data
 )
 {
-   util_vlegConfigure(widget);
+   util_vlegConfigure(gMainCvleg);
 }
 
 gboolean main_vleg_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
@@ -3013,6 +3079,38 @@ gboolean main_key_press_event(
       case GDK_KEY_D:
          --gDebugLevel;
          if (gDebugLevel < 0) gDebugLevel = 0;
+         break;
+
+      case GDK_KEY_1:
+
+         if (!g1Tick) g1Tick = gBlueTick;
+         if (!g2Tick) g2Tick = gBlueTick;
+
+         if (gBlueTick <= g2Tick)
+         {
+            g1Tick = gBlueTick;
+         }
+         else
+         {
+            g1Tick = g2Tick;
+            g2Tick = gBlueTick;
+         }
+         break;
+
+      case GDK_KEY_2:
+
+         if (!g1Tick) g1Tick = gBlueTick;
+         if (!g2Tick) g2Tick = gBlueTick;
+
+         if (gBlueTick >= g1Tick)
+         {
+            g2Tick = gBlueTick;
+         }
+         else
+         {
+            g2Tick = g1Tick;
+            g1Tick = gBlueTick;
+         }
          break;
 
       case GDK_KEY_g:
@@ -3200,6 +3298,11 @@ int main(int argc, char *argv[])
       gtk_widget_get_events(gMainCbuf) |
          GDK_BUTTON_PRESS_MASK
    );
+
+   gtk_window_set_transient_for(GTK_WINDOW(gCmdsDialog), GTK_WINDOW(gMain));
+   gtk_window_set_transient_for(GTK_WINDOW(gGpioDialog), GTK_WINDOW(gMain));
+   gtk_window_set_transient_for(GTK_WINDOW(gTrigDialog), GTK_WINDOW(gMain));
+   gtk_window_set_transient_for(GTK_WINDOW(gTrgsDialog), GTK_WINDOW(gMain));
 
    gtk_widget_show_all((GtkWidget*)gMain);
 

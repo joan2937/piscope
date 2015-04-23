@@ -87,3 +87,14 @@ NOTES
 =====
 
 In all modes the down and up cursor keys zoom the time scale in and out.
+
+Samples can be saved with File Save All Samples or File Save Selected Samples.
+
+To select samples enter pause mode.  Press 1 to specify the start of the samples (green marker) and 2 to specify the end of the samples (red marker).
+
+The samples may be saved in the native piscope format or in VCD format.
+
+Data saved in VCD format may be viewed and further processed with GTKWave.
+
+Data saved in the native piscope format may be restored later with File Restore Saved Data.
+

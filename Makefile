@@ -21,6 +21,15 @@ $(EXEC): $(OBJS)
 
 piscope.o:	piscope.c
 
+hf:
+	cp piscope.hf     piscope
+
+sf:
+	cp piscope.sf     piscope
+
+x86_64:
+	cp piscope.x86_64 piscope
+
 clean:
 	rm -f *.o *.i *.s *~ piscope
 
