@@ -1729,7 +1729,7 @@ static gboolean main_util_input(gpointer user_data)
 
       FD_ZERO(&fds);
 
-      FD_SET(gPigNotify, &fds);
+      if (gPigNotify >= 0) FD_SET(gPigNotify, &fds);
 
       if (select(gPigNotify+1, &fds, NULL, NULL, &tv) != 1) break;
 
