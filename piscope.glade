@@ -1160,7 +1160,6 @@
                   <object class="GtkMenuItem" id="main_menu_help">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="right_justified">True</property>
                     <property name="label" translatable="yes">_Help</property>
                     <property name="use_underline">True</property>
                     <child type="submenu">
