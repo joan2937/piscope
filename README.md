@@ -1,5 +1,5 @@
 # piscope
-A digital waveform viewer
+A logic analyser (digital waveform viewer)
 
 piscope uses the services of the pigpio library.  pigpio needs to be running on the Pi whose gpios are to be monitored.
 
