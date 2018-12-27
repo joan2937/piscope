@@ -22,6 +22,10 @@ make x86_64 # to run on a 64 bit Linux PC
 
 sudo apt-get install gtk+-3.0 # may take a long time
 
+On Debian 9 (Stretch):
+
+sudo apt-get install libgtk-3-dev
+
 make
 
 # to install
