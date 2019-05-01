@@ -34,7 +34,7 @@ make install
 
 # To run you need the pigpio daemon
 
-wget abyz.co.uk/rpi/pigpio/pigpio.zip
+wget https://abyz.me.uk/rpi/pigpio/pigpio.zip
 unzip pigpio.zip
 cd PIGPIO
 make

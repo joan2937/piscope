@@ -29,7 +29,7 @@ For more information, please refer to <http://unlicense.org/>
 
 piscope uses pigpiod to provide the raw data from the gpios.
 
-http://abyz.co.uk/rpi/pigpio/index.html
+https://abyz.me.uk/rpi/pigpio/index.html
 
 On the Pi you need to
 
@@ -2779,7 +2779,7 @@ void main_menu_help_about_activate
       "program-name", "piscope",
       "title", "About piscope",
       "version", PISCOPE_VERSION,
-      "website", "http://abyz.co.uk/rpi/pigpio/piscope.html",
+      "website", "https://abyz.me.uk/rpi/pigpio/piscope.html",
       "website-label", "piscope",
       "comments", "A digital waveform viewer for the Raspberry",
       NULL
@@ -3270,7 +3270,7 @@ int main(int argc, char *argv[])
 
    gtk_window_set_title(
       GTK_WINDOW(gMain),
-      "piscope (http://abyz.co.uk/rpi/pigpio/piscope.html)");
+      "piscope (https://abyz.me.uk/rpi/pigpio/piscope.html)");
 
    /* set a minimum size */
 
