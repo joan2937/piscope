@@ -1228,6 +1228,34 @@ static int file_save(int filetype, char *filename, int selection)
 
 /* GPIO ------------------------------------------------------------------- */
 
+void gpio_clear_all(GtkButton * button, gpointer user_data)
+{
+   int i;
+   /* set states */
+   for (i=0; i<PISCOPE_GPIOS; i++)
+   {
+      gGpioInfo[i].hilit = 0;
+      gtk_toggle_button_set_active(gGpioInfo[i].button, FALSE);
+   }
+
+   util_vlegConfigure(gMainCvleg);
+   gtk_widget_queue_draw(gMainCvleg);
+}
+
+void gpio_set_all(GtkButton * button, gpointer user_data)
+{
+   int i;
+   /* set states */
+   for (i=0; i<PISCOPE_GPIOS; i++)
+   {
+      gGpioInfo[i].hilit = !0;
+      gtk_toggle_button_set_active(gGpioInfo[i].button, TRUE);
+   }
+
+   util_vlegConfigure(gMainCvleg);
+   gtk_widget_queue_draw(gMainCvleg);
+}
+
 void gpio_apply_clicked(GtkButton * button, gpointer user_data)
 {
    int i;
