@@ -50,13 +50,6 @@ sudo pigpiod # launch the pigpio daemon
 
 # If running piscope on another machine
 
-export PIGPIO_ADDR=host # where host is the Pi's hostname
-
-# or
-
-export PIGPIO_ADDR=x.x.x.x # where x.x.x.x is the Pi's IP address.
-
-# then
-
 piscope &
 
+then set the address and port of the machine running pigpiod in the preferences dialog

@@ -31,10 +31,9 @@ Pi captures data, Pi processes data, remote displays data
 On a remote machine
 -------------------
 
-remote_host ~ $ export PIGPIO_ADDR=pi_host
-
 remote_host ~ $ piscope
 
+Then, in the preferences dialog, set the address/hostname and port of the machine running pigpio.
 Pi captures data, remote processes data, remote displays data
 
 OPERATING MODES

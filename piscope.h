@@ -30,9 +30,7 @@ For more information, please refer to <http://unlicense.org/>
 
 /* from pigpio pigpio.h */
 
-#define PI_ENVPORT "PIGPIO_PORT"
-#define PI_ENVADDR "PIGPIO_ADDR"
-
+#define PI_DEFAULT_SERVER_ADDRESS "127.0.0.1"
 #define PI_DEFAULT_SOCKET_PORT 8888
 
 #define PI_CMD_HWVER 17
