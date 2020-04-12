@@ -828,7 +828,7 @@ static void pigpioLoadSettings(void)
    gsize len;
 
    cfg = g_key_file_new();
-   file = g_build_filename(g_get_user_config_dir(), "piscope.conf", NULL);
+   file = g_build_filename(g_get_user_config_dir(), SETTINGS_FILE_NAME, NULL);
 
    loaded = g_key_file_load_from_file(cfg, file, G_KEY_FILE_NONE, NULL);
 
@@ -840,18 +840,18 @@ static void pigpioLoadSettings(void)
 
    if(loaded)
    {
-      gSettings.serverAddress = g_key_file_get_string(cfg, "Settings", "serverAddress", NULL);
-      gSettings.activeGPIOs = g_key_file_get_integer_list (cfg, "Settings", "activeGPIOs", &gSettings.activeGPIOCount, NULL);
-      gSettings.port = g_key_file_get_integer(cfg, "Settings", "serverPort", NULL);
-      gSettings.triggerSamples = g_key_file_get_integer(cfg, "Settings", "triggerSamples", NULL);
+      gSettings.serverAddress = g_key_file_get_string(cfg, SETTINGS_GROUP, SETTINGS_SERVER_ADDRESS, NULL);
+      gSettings.activeGPIOs = g_key_file_get_integer_list (cfg, SETTINGS_GROUP, SETTINGS_ACTIVE_GPIOS, &gSettings.activeGPIOCount, NULL);
+      gSettings.port = g_key_file_get_integer(cfg, SETTINGS_GROUP, SETTINGS_SERVER_PORT, NULL);
+      gSettings.triggerSamples = g_key_file_get_integer(cfg, SETTINGS_GROUP, SETTINGS_TRIGGER_SAMPLES, NULL);
       for(i=0; i<PISCOPE_TRIGGERS; i++)
          {
-            sprintf(buf, "trigger%dEnabled", i+1);
-            gSettings.triggers[i].enabled = g_key_file_get_boolean(cfg, "Settings", buf, NULL);
-            sprintf(buf, "trigger%dAction", i+1);
-            gSettings.triggers[i].action = g_key_file_get_integer(cfg, "Settings", buf, NULL);
-            sprintf(buf, "trigger%dGPIOTypes", i+1);
-            tempList = g_key_file_get_integer_list(cfg, "Settings", buf, &len, NULL);
+            sprintf(buf, SETTINGS_TRIGGER_ENABLED, i+1);
+            gSettings.triggers[i].enabled = g_key_file_get_boolean(cfg, SETTINGS_GROUP, buf, NULL);
+            sprintf(buf, SETTINGS_TRIGGER_ACTION, i+1);
+            gSettings.triggers[i].action = g_key_file_get_integer(cfg, SETTINGS_GROUP, buf, NULL);
+            sprintf(buf, SETTINGS_TRIGGER_GPIO_TYPES, i+1);
+            tempList = g_key_file_get_integer_list(cfg, SETTINGS_GROUP, buf, &len, NULL);
             if(tempList)
                {
                   for(j=0; j<len && j<PISCOPE_GPIOS; j++)
@@ -881,22 +881,22 @@ static void pigpioSaveSettings(void)
    int i;
 
    cfg = g_key_file_new();
-   file = g_build_filename(g_get_user_config_dir(), "piscope.conf", NULL);
+   file = g_build_filename(g_get_user_config_dir(), SETTINGS_FILE_NAME, NULL);
 
-   g_key_file_set_string(cfg, "Settings", "serverAddress", gSettings.serverAddress);
-   g_key_file_set_integer(cfg, "Settings", "serverPort", gSettings.port);
+   g_key_file_set_string(cfg, SETTINGS_GROUP, SETTINGS_SERVER_ADDRESS, gSettings.serverAddress);
+   g_key_file_set_integer(cfg, SETTINGS_GROUP, SETTINGS_SERVER_PORT, gSettings.port);
    if(gSettings.activeGPIOs)
-      g_key_file_set_integer_list(cfg, "Settings", "activeGPIOs", gSettings.activeGPIOs, gSettings.activeGPIOCount);
+      g_key_file_set_integer_list(cfg, SETTINGS_GROUP, SETTINGS_ACTIVE_GPIOS, gSettings.activeGPIOs, gSettings.activeGPIOCount);
 
-   g_key_file_set_integer(cfg, "Settings", "triggerSamples", gSettings.triggerSamples);
+   g_key_file_set_integer(cfg, SETTINGS_GROUP, SETTINGS_TRIGGER_SAMPLES, gSettings.triggerSamples);
    for(i=0; i<PISCOPE_TRIGGERS; i++)
       {
-         sprintf(buf, "trigger%dEnabled", i+1);
-         g_key_file_set_boolean(cfg, "Settings", buf, gSettings.triggers[i].enabled);
-         sprintf(buf, "trigger%dAction", i+1);
-         g_key_file_set_integer(cfg, "Settings", buf, gSettings.triggers[i].action);
-         sprintf(buf, "trigger%dGPIOTypes", i+1);
-         g_key_file_set_integer_list(cfg, "Settings", buf, gSettings.triggers[i].gpiotypes, PISCOPE_GPIOS);
+         sprintf(buf, SETTINGS_TRIGGER_ENABLED, i+1);
+         g_key_file_set_boolean(cfg, SETTINGS_GROUP, buf, gSettings.triggers[i].enabled);
+         sprintf(buf, SETTINGS_TRIGGER_ACTION, i+1);
+         g_key_file_set_integer(cfg, SETTINGS_GROUP, buf, gSettings.triggers[i].action);
+         sprintf(buf, SETTINGS_TRIGGER_GPIO_TYPES, i+1);
+         g_key_file_set_integer_list(cfg, SETTINGS_GROUP, buf, gSettings.triggers[i].gpiotypes, PISCOPE_GPIOS);
       }
    g_key_file_save_to_file(cfg, file, NULL);
 

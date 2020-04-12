@@ -33,6 +33,16 @@ For more information, please refer to <http://unlicense.org/>
 #define PI_DEFAULT_SERVER_ADDRESS "127.0.0.1"
 #define PI_DEFAULT_SOCKET_PORT 8888
 
+#define SETTINGS_FILE_NAME "piscope.conf"
+#define SETTINGS_GROUP "Settings"
+#define SETTINGS_SERVER_ADDRESS "serverAddress"
+#define SETTINGS_SERVER_PORT "serverPort"
+#define SETTINGS_ACTIVE_GPIOS "activeGPIOs"
+#define SETTINGS_TRIGGER_SAMPLES "triggerSamples"
+#define SETTINGS_TRIGGER_ENABLED "trigger%dEnabled"
+#define SETTINGS_TRIGGER_ACTION "trigger%dAction"
+#define SETTINGS_TRIGGER_GPIO_TYPES "trigger%dGPIOTypes"
+
 #define PI_CMD_HWVER 17
 #define PI_CMD_NB    19
 #define PI_CMD_NC    21
