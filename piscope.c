@@ -36,7 +36,17 @@ On the Pi you need to
 sudo pigpiod # to start the pigpio daemon
 
 If you are running piscope remotely (i.e. not on the Pi running pigpiod)
-you need to set the address/hostname and port of machine running pigpiod in the preferences dialog.
+you can either:
+- set the environment variable PIGPIO_ADDR to specify the
+  machine running pigpiod.
+
+  e.g.
+  export PIGPIO_ADDR=soft # specify by host name
+  or
+  export PIGPIO_ADDR=192.168.1.67 # specify by IP address
+
+ - set the address/hostname and port of machine running pigpiod in the preferences dialog.
+  (Note: if set, the PIGPIO_ADDR environment variable takes always the precedence)
 
 */
 
@@ -811,10 +821,26 @@ static int pigpioCommand(int fd, int command, int p1, int p2)
 
 static void pigpioSetAddr(void)
 {
-   char portStr[16];
-   sprintf(portStr, "%d", gSettings.port);
+   char * portStr, * addrStr;
+   char buf[16];
 
-   gtk_entry_set_text(GTK_ENTRY(gCmdsPigpioAddr), gSettings.serverAddress);
+   portStr = getenv(PI_ENVPORT);
+
+   if ((!portStr) || (!strlen(portStr)))
+   {
+      sprintf(buf, "%d", gSettings.port);
+      portStr = buf;
+   }
+
+   addrStr = getenv(PI_ENVADDR);
+
+   if ((!addrStr) || (!strlen(addrStr)))
+   {
+      addrStr=gSettings.serverAddress;
+   }
+
+   gtk_entry_set_text(GTK_ENTRY(gCmdsPigpioAddr), addrStr);
+
    gtk_entry_set_text(GTK_ENTRY(gCmdsPigpioPort), portStr);
 }
 
@@ -3273,7 +3299,40 @@ gboolean main_key_press_event(
   return FALSE;
 }
 
+void main_util_setWindowTitle()
+{
+   char *addrStr = getenv(PI_ENVADDR);
+   char *portStr = getenv(PI_ENVPORT);
+   char *title = "piscope (http://abyz.co.uk/rpi/pigpio/piscope.html)";
+   gboolean addrValid = addrStr && strlen(addrStr);
+   gboolean portValid = portStr && strlen(portStr);
 
+   if (addrValid || portValid)
+   {
+       char buf[400];
+       strncpy(buf, title, sizeof(buf));
+       strncat(buf, " - [USING ENV VARS: ", sizeof(buf)-strlen(buf));
+       if (addrValid)
+       {
+           strncat(buf, PI_ENVADDR, sizeof(buf)-strlen(buf));
+           strncat(buf, "=", sizeof(buf)-strlen(buf));
+           strncat(buf, addrStr, sizeof(buf)-strlen(buf));
+           if(portValid)
+               strncat(buf, ", ", sizeof(buf)-strlen(buf));
+       }
+
+       if (portValid)
+       {
+           strncat(buf, PI_ENVPORT, sizeof(buf)-strlen(buf));
+           strncat(buf, "=", sizeof(buf)-strlen(buf));
+           strncat(buf, portStr, sizeof(buf)-strlen(buf));
+       }
+       strncat(buf, "]", sizeof(buf)-strlen(buf));
+       title = buf;
+   }
+
+   gtk_window_set_title(GTK_WINDOW(gMain), title);
+}
 /* MAIN ------------------------------------------------------------------- */
 
 int main(int argc, char *argv[])
@@ -3421,9 +3480,7 @@ int main(int argc, char *argv[])
 
    pigpioSetAddr();
 
-   gtk_window_set_title(
-      GTK_WINDOW(gMain),
-      "piscope (http://abyz.co.uk/rpi/pigpio/piscope.html)");
+   main_util_setWindowTitle();
 
    /* set a minimum size */
 

@@ -48,8 +48,21 @@ make install
 
 sudo pigpiod # launch the pigpio daemon
 
-# If running piscope on another machine
+# If running piscope on another machine you have 2 ways to connect:
 
-piscope &
+1) Set the remote address via environment variables BEFORE launching piscope:
+  export PIGPIO_ADDR=host # where host is the Pi's hostname
 
-then set the address and port of the machine running pigpiod in the preferences dialog
+  # or
+
+  export PIGPIO_ADDR=x.x.x.x # where x.x.x.x is the Pi's IP address.
+
+  # then
+
+  piscope &
+
+2) Set the remote address in the preferences dialog
+  piscope &
+
+  # then open the preferences dialog and set Pi's hostname/address
+  # (Note: if set, the PIGPIO_ADDR environment variable takes always the precedence)
