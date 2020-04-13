@@ -35,6 +35,8 @@ remote_host ~ $ export PIGPIO_ADDR=pi_host
 
 remote_host ~ $ piscope
 
+Alternatively, you can avoid setting the PIGPIO_ADDR environment variable and set the server hostname/address in the preferences dialog.
+(Note: if set, the PIGPIO_ADDR environment variables takes always the precedence)
 Pi captures data, remote processes data, remote displays data
 
 OPERATING MODES

@@ -36,16 +36,17 @@ On the Pi you need to
 sudo pigpiod # to start the pigpio daemon
 
 If you are running piscope remotely (i.e. not on the Pi running pigpiod)
-you need to set the environment variable PIGPIO_ADDR to specify the
-machine running pigpiod.
+you can either:
+- set the environment variable PIGPIO_ADDR to specify the
+  machine running pigpiod.
 
-e.g.
+  e.g.
+  export PIGPIO_ADDR=soft # specify by host name
+  or
+  export PIGPIO_ADDR=192.168.1.67 # specify by IP address
 
-export PIGPIO_ADDR=soft # specify by host name
-
-or
-
-export PIGPIO_ADDR=192.168.1.67 # specify by IP address
+ - set the address/hostname and port of machine running pigpiod in the preferences dialog.
+  (Note: if set, the PIGPIO_ADDR environment variable takes always the precedence)
 
 */
 
@@ -180,6 +181,22 @@ typedef struct
    char *name;
 } piscopeGpioUsage_t;
 
+typedef struct
+{
+   gboolean enabled;
+   gint action;
+   gint gpiotypes[PISCOPE_GPIOS];
+} piscopeTriggerSettings_t;
+
+typedef struct
+{
+   gchar *serverAddress;
+   gint  *activeGPIOs;
+   gsize activeGPIOCount;
+   gint  port;
+   gint triggerSamples;
+   piscopeTriggerSettings_t triggers[PISCOPE_TRIGGERS];
+} piscopeSettings_t;
 
 /* GLOBALS ---------------------------------------------------------------- */
 
@@ -360,6 +377,8 @@ static cairo_surface_t  *gCsampSurface = NULL;
 static cairo_surface_t  *gCmodeSurface    = NULL;
 
 static cairo_t          *gCoscCairo = NULL;
+
+static piscopeSettings_t gSettings;
 
 gboolean main_osc_configure_event
 (
@@ -760,7 +779,7 @@ static char *util_timeStamp(int64_t *tick, int decimals, int blue)
       gtk_label_set_text((GtkLabel*)gMainLblue, blueBuf);
    }
 
-   timeradd(&gTimeOrigin, &offsetTime, &now);   
+   timeradd(&gTimeOrigin, &offsetTime, &now);
 
    if (now.tv_sec != last.tv_sec)
    {
@@ -809,7 +828,7 @@ static void pigpioSetAddr(void)
 
    if ((!portStr) || (!strlen(portStr)))
    {
-      sprintf(buf, "%d", PI_DEFAULT_SOCKET_PORT);
+      sprintf(buf, "%d", gSettings.port);
       portStr = buf;
    }
 
@@ -817,12 +836,102 @@ static void pigpioSetAddr(void)
 
    if ((!addrStr) || (!strlen(addrStr)))
    {
-      addrStr="127.0.0.1";
+      addrStr=gSettings.serverAddress;
    }
 
    gtk_entry_set_text(GTK_ENTRY(gCmdsPigpioAddr), addrStr);
 
    gtk_entry_set_text(GTK_ENTRY(gCmdsPigpioPort), portStr);
+}
+
+static void pigpioLoadSettings(void)
+{
+   GKeyFile *cfg;
+   char *file, buf[50];
+   gint *tempList;
+   gboolean loaded;
+   int i, j;
+   gsize len;
+
+   cfg = g_key_file_new();
+   file = g_build_filename(g_get_user_config_dir(), SETTINGS_FILE_NAME, NULL);
+
+   loaded = g_key_file_load_from_file(cfg, file, G_KEY_FILE_NONE, NULL);
+
+   g_free(gSettings.serverAddress);
+   g_free(gSettings.activeGPIOs);
+   gSettings.serverAddress=NULL;
+   gSettings.activeGPIOs=NULL;
+   gSettings.activeGPIOCount=0;
+
+   if(loaded)
+   {
+      gSettings.serverAddress = g_key_file_get_string(cfg, SETTINGS_GROUP, SETTINGS_SERVER_ADDRESS, NULL);
+      gSettings.activeGPIOs = g_key_file_get_integer_list (cfg, SETTINGS_GROUP, SETTINGS_ACTIVE_GPIOS, &gSettings.activeGPIOCount, NULL);
+      gSettings.port = g_key_file_get_integer(cfg, SETTINGS_GROUP, SETTINGS_SERVER_PORT, NULL);
+      gSettings.triggerSamples = g_key_file_get_integer(cfg, SETTINGS_GROUP, SETTINGS_TRIGGER_SAMPLES, NULL);
+      for(i=0; i<PISCOPE_TRIGGERS; i++)
+         {
+            sprintf(buf, SETTINGS_TRIGGER_ENABLED, i+1);
+            gSettings.triggers[i].enabled = g_key_file_get_boolean(cfg, SETTINGS_GROUP, buf, NULL);
+            sprintf(buf, SETTINGS_TRIGGER_ACTION, i+1);
+            gSettings.triggers[i].action = g_key_file_get_integer(cfg, SETTINGS_GROUP, buf, NULL);
+            sprintf(buf, SETTINGS_TRIGGER_GPIO_TYPES, i+1);
+            tempList = g_key_file_get_integer_list(cfg, SETTINGS_GROUP, buf, &len, NULL);
+            if(tempList)
+               {
+                  for(j=0; j<len && j<PISCOPE_GPIOS; j++)
+                     {
+                        gSettings.triggers[i].gpiotypes[j] = tempList[j];
+                     }
+               }
+            g_free(tempList);
+         }
+   }
+
+   if(!gSettings.serverAddress)
+   {
+      gSettings.serverAddress = g_malloc(sizeof(PI_DEFAULT_SERVER_ADDRESS));
+      strcpy (gSettings.serverAddress, PI_DEFAULT_SERVER_ADDRESS);
+      gSettings.port = PI_DEFAULT_SOCKET_PORT;
+   }
+
+   g_free(file);
+   g_key_file_free(cfg);
+}
+
+static void pigpioSaveSettings(void)
+{
+   GKeyFile * cfg;
+   char * file, buf[50];
+   int i;
+
+   cfg = g_key_file_new();
+   file = g_build_filename(g_get_user_config_dir(), SETTINGS_FILE_NAME, NULL);
+
+   g_key_file_set_string(cfg, SETTINGS_GROUP, SETTINGS_SERVER_ADDRESS, gSettings.serverAddress);
+   g_key_file_set_integer(cfg, SETTINGS_GROUP, SETTINGS_SERVER_PORT, gSettings.port);
+   if(gSettings.activeGPIOs)
+      g_key_file_set_integer_list(cfg, SETTINGS_GROUP, SETTINGS_ACTIVE_GPIOS, gSettings.activeGPIOs, gSettings.activeGPIOCount);
+
+   g_key_file_set_integer(cfg, SETTINGS_GROUP, SETTINGS_TRIGGER_SAMPLES, gSettings.triggerSamples);
+   for(i=0; i<PISCOPE_TRIGGERS; i++)
+      {
+         sprintf(buf, SETTINGS_TRIGGER_ENABLED, i+1);
+         g_key_file_set_boolean(cfg, SETTINGS_GROUP, buf, gSettings.triggers[i].enabled);
+         sprintf(buf, SETTINGS_TRIGGER_ACTION, i+1);
+         g_key_file_set_integer(cfg, SETTINGS_GROUP, buf, gSettings.triggers[i].action);
+         sprintf(buf, SETTINGS_TRIGGER_GPIO_TYPES, i+1);
+         g_key_file_set_integer_list(cfg, SETTINGS_GROUP, buf, gSettings.triggers[i].gpiotypes, PISCOPE_GPIOS);
+      }
+   g_key_file_save_to_file(cfg, file, NULL);
+
+   g_free(file);
+   g_key_file_free(cfg);
+}
+
+static int cmpfunc(const void * a, const void * b) {
+   return ( *(int*)a - *(int*)b );
 }
 
 static void pigpioSetGpios(void)
@@ -850,7 +959,8 @@ static void pigpioSetGpios(void)
          case 3:
             gGpioInfo[i].name = gGpioUsage[gRPiRevision-1][i].name;
 
-            if (gGpioUsage[gRPiRevision-1][i].usable)
+            if (gGpioUsage[gRPiRevision-1][i].usable && (!gSettings.activeGPIOs ||
+                  bsearch(&i, gSettings.activeGPIOs, gSettings.activeGPIOCount, sizeof (int), cmpfunc)))
                gGpioInfo[i].display = 1;
 
             break;
@@ -871,6 +981,76 @@ static void pigpioSetGpios(void)
    }
 
    pigpioCommand(gPigSocket, PI_CMD_NB, gPigHandle, notifyBits);
+}
+
+static void util_setTriggerGPIOTypes(int triggerNum)
+{
+   int i, v;
+   uint32_t levelMask;
+   uint32_t changedMask;
+   uint32_t levelValue;
+
+   levelMask    = 0;
+   levelValue   = 0;
+   changedMask  = 0;
+
+   for (i=0; i<PISCOPE_GPIOS; i++)
+   {
+      v = gSettings.triggers[triggerNum].gpiotypes[i];
+      gTrigInfo[triggerNum].type[i] = v;
+
+      switch (v)
+      {
+         case piscope_dont_care:
+            break;
+
+         case piscope_low:
+            levelMask |= (1<<i);
+            break;
+
+         case piscope_high:
+            levelMask  |= (1<<i);
+            levelValue |= (1<<i);
+            break;
+
+         case piscope_edge:
+            changedMask |= (1<<i);
+            break;
+
+         case piscope_falling:
+            levelMask   |= (1<<i);
+            changedMask |= (1<<i);
+            break;
+
+         case piscope_rising:
+            levelMask   |= (1<<i);
+            levelValue  |= (1<<i);
+            changedMask |= (1<<i);
+            break;
+      }
+   }
+
+   gTrigInfo[triggerNum].levelMask = levelMask;
+   gTrigInfo[triggerNum].levelValue = levelValue;
+   gTrigInfo[triggerNum].changedMask = changedMask;
+}
+
+static void pigpioSetTriggers(void)
+{
+   int i;
+
+   sscanf(gTrigSamplesText[gSettings.triggerSamples], "%d", &gTrigSamples);
+   gtk_combo_box_set_active(GTK_COMBO_BOX(gTrgsSamples),  gSettings.triggerSamples);
+
+   for(i=0; i<PISCOPE_TRIGGERS; i++)
+   {
+      gTrigInfo[i].enabled = gSettings.triggers[i].enabled;
+      gTrigInfo[i].when = gSettings.triggers[i].action;
+      util_setTriggerGPIOTypes(i);
+
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(gTrigInfo[i].onW), gTrigInfo[i].enabled);
+      gtk_combo_box_set_active(GTK_COMBO_BOX(gTrigInfo[i].whenW), gTrigInfo[i].when);
+   }
 }
 
 static void pigpioSetState(void)
@@ -973,10 +1153,12 @@ static void pigpioConnect(void)
          util_popupMessage(GTK_MESSAGE_WARNING, GTK_BUTTONS_CLOSE,
             "Can't connect to pigpio.\n" \
             "Did you sudo pigpiod?\n" \
-            "Have you set PIGPIO_ADDR?");
+            "If you are on a remote client, have you set the server address and port in the preferences?");
       }
 
       pigpioSetGpios();
+
+      pigpioSetTriggers();
 
       pigpioSetState();
 
@@ -1029,7 +1211,17 @@ void cmds_clear_triggers_clicked(GtkButton * button, gpointer user_data)
 
 void cmds_close_clicked(GtkButton * button, gpointer user_data)
 {
+   const char *serverAddress;
    gtk_widget_hide(gCmdsDialog);
+
+   g_free(gSettings.serverAddress);
+   gSettings.serverAddress=NULL;
+   serverAddress = gtk_entry_get_text(GTK_ENTRY(gCmdsPigpioAddr));
+   gSettings.serverAddress = g_malloc(strlen(serverAddress)+1);
+   strcpy(gSettings.serverAddress, serverAddress);
+   gSettings.port = strtol(gtk_entry_get_text(GTK_ENTRY(gCmdsPigpioPort)), NULL, 10);
+
+   pigpioSaveSettings();
 }
 
 void cmds_emptybuf_clicked(GtkButton * button, gpointer user_data)
@@ -1077,7 +1269,7 @@ static int file_load(char *filename)
    FILE * in;
    time_t time;
    struct tm cal;
-   char buf[512]; 
+   char buf[512];
 
    err = 1;
 
@@ -1166,7 +1358,7 @@ static int file_save(int filetype, char *filename, int selection)
 
       for (b=0; b<32; b++)
          fprintf(out, "$var wire 1 %c %d $end\n", file_VCDsymbol(b), b);
-        
+
       fprintf(out, "$upscope $end\n");
       fprintf(out, "$enddefinitions $end\n");
    }
@@ -1237,7 +1429,9 @@ void gpio_apply_clicked(GtkButton * button, gpointer user_data)
 
    /* get and set states */
 
-   gDisplayedGpios = 0;
+   g_free(gSettings.activeGPIOs);
+   gSettings.activeGPIOCount = gDisplayedGpios = 0;
+   gSettings.activeGPIOs = g_malloc(PISCOPE_GPIOS * sizeof(gint));
 
    for (i=0; i<PISCOPE_GPIOS; i++)
    {
@@ -1246,6 +1440,7 @@ void gpio_apply_clicked(GtkButton * button, gpointer user_data)
 
       if (gGpioInfo[i].display)
       {
+         gSettings.activeGPIOs[gSettings.activeGPIOCount++] = i;
          gDisplayedGpios++;
 
          notifyBits |= (1<<i);
@@ -1259,11 +1454,15 @@ void gpio_apply_clicked(GtkButton * button, gpointer user_data)
 
       gDisplayedGpios      = 1;
       gGpioInfo[0].display = 1;
+      gSettings.activeGPIOs[0] = 0;
+      gSettings.activeGPIOCount = 1;
    }
 
    pigpioCommand(gPigSocket, PI_CMD_NB, gPigHandle, notifyBits);
 
    util_calcGpioY();
+
+   pigpioSaveSettings();
 }
 
 void gpio_cancel_clicked(GtkButton * button, gpointer user_data)
@@ -1411,64 +1610,42 @@ void trgs_edit4_clicked(GtkButton * button, gpointer user_data)
 
 void trgs_close_clicked(GtkButton * button, gpointer user_data)
 {
+   int i, j;
    gtk_widget_hide(gTrgsDialog);
+
+   for(i=0; i< sizeof(gTrigSamplesText)/sizeof(gTrigSamplesText[0]); i++)
+      {
+         sscanf(gTrigSamplesText[i], "%d", &j);
+         if(j == gTrigSamples)
+            {
+               gSettings.triggerSamples = i;
+               break;
+            }
+      }
+
+   for(i=0; i<PISCOPE_TRIGGERS; i++)
+      {
+         gSettings.triggers[i].enabled = gTrigInfo[i].enabled;
+         gSettings.triggers[i].action = gTrigInfo[i].when;
+         for (j=0; j<PISCOPE_GPIOS; j++)
+            gSettings.triggers[i].gpiotypes[j] = gTrigInfo[i].type[j];
+      }
+   pigpioSaveSettings();
 }
 
 /* TRIG ------------------------------------------------------------------- */
 
 void trig_apply_clicked(GtkButton * button, gpointer user_data)
 {
-   uint32_t levelMask;
-   uint32_t changedMask;
-   uint32_t levelValue;
-   int i, v;
-
-   levelMask    = 0;
-   levelValue   = 0;
-   changedMask  = 0;
+   int i;
 
    if (!gTriggerNum) return;
 
    for (i=0; i<PISCOPE_GPIOS; i++)
-   {
-      v = gtk_combo_box_get_active(GTK_COMBO_BOX(gTrigCombo[i]));
-
-      gTrigInfo[gTriggerNum-1].type[i] = v;
-
-      switch (v)
       {
-         case piscope_dont_care:
-            break;
-
-         case piscope_low:
-            levelMask |= (1<<i);
-            break;
-
-         case piscope_high:
-            levelMask  |= (1<<i);
-            levelValue |= (1<<i);
-            break;
-
-         case piscope_edge:
-            changedMask |= (1<<i);
-            break;
-
-         case piscope_falling:
-            levelMask   |= (1<<i);
-            changedMask |= (1<<i);
-            break;
-
-         case piscope_rising:
-            levelMask   |= (1<<i);
-            levelValue  |= (1<<i);
-            changedMask |= (1<<i);
-            break;
+         gSettings.triggers[gTriggerNum-1].gpiotypes[i] = gtk_combo_box_get_active(GTK_COMBO_BOX(gTrigCombo[i]));
       }
-   }
-
-   gTrigInfo[gTriggerNum-1].levelMask = levelMask;
-   gTrigInfo[gTriggerNum-1].levelValue = levelValue;
-   gTrigInfo[gTriggerNum-1].changedMask = changedMask;
+   util_setTriggerGPIOTypes(gTriggerNum-1);
 
    trgs_lab_str(gTriggerNum-1);
 
@@ -1758,7 +1935,7 @@ static gboolean main_util_input(gpointer user_data)
       }
 
       /* copy any partial report to start of array */
-      
+
       if (got && r) gReport[0] = gReport[r];
    }
 
@@ -2473,7 +2650,7 @@ gboolean main_osc_motion_notify_event(
 
    }
 
-   return TRUE; 
+   return TRUE;
 }
 
 gboolean main_osc_button_press_event(
@@ -2511,7 +2688,7 @@ gboolean main_osc_button_press_event(
       gViewCentreTick += ticks;
    }
 
-  return TRUE; 
+  return TRUE;
 }
 
 
@@ -2555,7 +2732,7 @@ gboolean main_samp_button_press_event(
       main_util_labelTick(&gGoldTick, gMainLgold);
    }
 
-  return TRUE; 
+  return TRUE;
 }
 
 void main_samp_configure_event
@@ -2710,13 +2887,13 @@ void main_menu_file_save(GtkMenuItem *menuitem, int selection)
          if (strcasecmp(".vcd", filename + strlen(filename) - 4) == 0)
             textfile = 0;
       }
-     
+
       if (strlen(filename) > 7)
       {
          if (strcasecmp(".piscope", filename + strlen(filename) - 8) == 0)
             textfile = 1;
       }
-     
+
       if (textfile)
          file_save(piscope_text, filename, selection);
       else
@@ -3013,7 +3190,7 @@ gboolean main_vleg_button_press_event(
       }
    }
 
-  return TRUE; 
+  return TRUE;
 }
 
 /* MAIN KEY --------------------------------------------------------------- */
@@ -3119,10 +3296,43 @@ gboolean main_key_press_event(
          break;
    }
 
-  return FALSE; 
+  return FALSE;
 }
 
+void main_util_setWindowTitle()
+{
+   char *addrStr = getenv(PI_ENVADDR);
+   char *portStr = getenv(PI_ENVPORT);
+   char *title = "piscope (http://abyz.co.uk/rpi/pigpio/piscope.html)";
+   gboolean addrValid = addrStr && strlen(addrStr);
+   gboolean portValid = portStr && strlen(portStr);
 
+   if (addrValid || portValid)
+   {
+       char buf[400];
+       strncpy(buf, title, sizeof(buf));
+       strncat(buf, " - [USING ENV VARS: ", sizeof(buf)-strlen(buf));
+       if (addrValid)
+       {
+           strncat(buf, PI_ENVADDR, sizeof(buf)-strlen(buf));
+           strncat(buf, "=", sizeof(buf)-strlen(buf));
+           strncat(buf, addrStr, sizeof(buf)-strlen(buf));
+           if(portValid)
+               strncat(buf, ", ", sizeof(buf)-strlen(buf));
+       }
+
+       if (portValid)
+       {
+           strncat(buf, PI_ENVPORT, sizeof(buf)-strlen(buf));
+           strncat(buf, "=", sizeof(buf)-strlen(buf));
+           strncat(buf, portStr, sizeof(buf)-strlen(buf));
+       }
+       strncat(buf, "]", sizeof(buf)-strlen(buf));
+       title = buf;
+   }
+
+   gtk_window_set_title(GTK_WINDOW(gMain), title);
+}
 /* MAIN ------------------------------------------------------------------- */
 
 int main(int argc, char *argv[])
@@ -3134,6 +3344,8 @@ int main(int argc, char *argv[])
    int  i, j, ui_ok;
 
    gtk_init(&argc, &argv);
+
+   pigpioLoadSettings();
 
   /* Construct a GtkBuilder instance and load our UI description */
 
@@ -3268,9 +3480,7 @@ int main(int argc, char *argv[])
 
    pigpioSetAddr();
 
-   gtk_window_set_title(
-      GTK_WINDOW(gMain),
-      "piscope (http://abyz.co.uk/rpi/pigpio/piscope.html)");
+   main_util_setWindowTitle();
 
    /* set a minimum size */
 
@@ -3336,4 +3546,3 @@ int main(int argc, char *argv[])
 
    return 0;
 }
-
