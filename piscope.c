@@ -29,28 +29,28 @@ For more information, please refer to <http://unlicense.org/>
 
 piscope uses pigpiod to provide the raw data from the gpios.
 
-https://abyz.me.uk/rpi/pigpio/index.html
+http://abyz.me.uk/rpi/pigpio/index.html
 
-On the Pi you need to
+On the Pi you need to start the pigpio daemon, e.g.
 
-sudo pigpiod # to start the pigpio daemon
+sudo pigpiod
 
 If you are running piscope remotely (i.e. not on the Pi running pigpiod)
-you can either:
-- set the environment variable PIGPIO_ADDR to specify the
-  machine running pigpiod.
+you can specify the Pi in one of the following ways.
 
-  e.g.
-  export PIGPIO_ADDR=soft # specify by host name
-  or
-  export PIGPIO_ADDR=192.168.1.67 # specify by IP address
+1. set the environment variable PIGPIO_ADDR
+   e.g.
+   export PIGPIO_ADDR=soft # specify by host name
+   or
+   export PIGPIO_ADDR=192.168.1.67 # specify by IP address
 
- - set the address/hostname and port of machine running pigpiod in the preferences dialog.
-  (Note: if set, the PIGPIO_ADDR environment variable takes always the precedence)
+2. set the address/hostname and port the piscope preferences dialog.
+
+Note: if set, the PIGPIO_ADDR environment variable takes precedence.
 
 */
 
-#define PISCOPE_VERSION "0.7"
+#define PISCOPE_VERSION "0.8"
 
 #include <gtk/gtk.h>
 
@@ -386,6 +386,8 @@ gboolean main_osc_configure_event
    GdkEventConfigure *event,
    gpointer           data
 );
+
+void main_util_setWindowTitle();
 
 /* FUNCTIONS -------------------------------------------------------------- */
 
@@ -731,7 +733,7 @@ static int util_popupMessage(int type, int buttons, const gchar * format, ...)
       GTK_DIALOG_DESTROY_WITH_PARENT,
       type,
       buttons,
-      str
+      "%s", str
    );
 
    status = gtk_dialog_run(GTK_DIALOG(dialog));
@@ -1072,6 +1074,8 @@ static void pigpioSetState(void)
          GTK_TOGGLE_TOOL_BUTTON(gMainTBpause), TRUE);
    }
 
+   main_util_setWindowTitle();
+   
    util_zoom_def_clicked();
 }
 
@@ -1130,6 +1134,8 @@ static int pigpioOpenNotifications(void)
 
 static void pigpioConnect(void)
 {
+   char msg[256];
+
    if (!gPigConnected)
    {
       gBufWritePos   = -1;
@@ -1150,10 +1156,11 @@ static void pigpioConnect(void)
       {
          gPigConnected = 0;
 
-         util_popupMessage(GTK_MESSAGE_WARNING, GTK_BUTTONS_CLOSE,
-            "Can't connect to pigpio.\n" \
-            "Did you sudo pigpiod?\n" \
-            "If you are on a remote client, have you set the server address and port in the preferences?");
+         snprintf(msg, sizeof(msg),
+            "Can't connect to pigpio at %s.\nDid you sudo pigpiod?\nIf you are on a remote client, have you set the server address and port?",
+             gtk_entry_get_text(GTK_ENTRY(gCmdsPigpioAddr)));
+         
+         util_popupMessage(GTK_MESSAGE_WARNING, GTK_BUTTONS_CLOSE, msg);
       }
 
       pigpioSetGpios();
@@ -1212,14 +1219,25 @@ void cmds_clear_triggers_clicked(GtkButton * button, gpointer user_data)
 void cmds_close_clicked(GtkButton * button, gpointer user_data)
 {
    const char *serverAddress;
+   char msg[128];
+   
    gtk_widget_hide(gCmdsDialog);
 
-   g_free(gSettings.serverAddress);
-   gSettings.serverAddress=NULL;
+   if (gSettings.serverAddress)
+   {
+      g_free(gSettings.serverAddress);
+      gSettings.serverAddress=NULL;
+   }
    serverAddress = gtk_entry_get_text(GTK_ENTRY(gCmdsPigpioAddr));
    gSettings.serverAddress = g_malloc(strlen(serverAddress)+1);
    strcpy(gSettings.serverAddress, serverAddress);
    gSettings.port = strtol(gtk_entry_get_text(GTK_ENTRY(gCmdsPigpioPort)), NULL, 10);
+   
+   if (!gPigConnected)
+   {
+      snprintf(msg, sizeof(msg), "Connect to pigpio at %s", serverAddress);
+      gtk_widget_set_tooltip_text(GTK_WIDGET(gMainTBconnect), msg);
+   }
 
    pigpioSaveSettings();
 }
@@ -1423,15 +1441,11 @@ static int file_save(int filetype, char *filename, int selection)
 void gpio_clear_all(GtkButton * button, gpointer user_data)
 {
    int i;
-   /* set states */
+   /* clear states */
    for (i=0; i<PISCOPE_GPIOS; i++)
    {
-      gGpioInfo[i].hilit = 0;
       gtk_toggle_button_set_active(gGpioInfo[i].button, FALSE);
    }
-
-   util_vlegConfigure(gMainCvleg);
-   gtk_widget_queue_draw(gMainCvleg);
 }
 
 void gpio_set_all(GtkButton * button, gpointer user_data)
@@ -1440,12 +1454,21 @@ void gpio_set_all(GtkButton * button, gpointer user_data)
    /* set states */
    for (i=0; i<PISCOPE_GPIOS; i++)
    {
-      gGpioInfo[i].hilit = !0;
       gtk_toggle_button_set_active(gGpioInfo[i].button, TRUE);
    }
+}
 
-   util_vlegConfigure(gMainCvleg);
-   gtk_widget_queue_draw(gMainCvleg);
+void gpio_invert_all(GtkButton * button, gpointer user_data)
+{
+   int i;
+   /* invert states */
+   for (i=0; i<PISCOPE_GPIOS; i++)
+   {
+      if (gtk_toggle_button_get_active(gGpioInfo[i].button))
+         gtk_toggle_button_set_active(gGpioInfo[i].button, FALSE);
+      else
+         gtk_toggle_button_set_active(gGpioInfo[i].button, TRUE);      
+   }
 }
 
 void gpio_apply_clicked(GtkButton * button, gpointer user_data)
@@ -2984,7 +3007,7 @@ void main_menu_help_about_activate
       "program-name", "piscope",
       "title", "About piscope",
       "version", PISCOPE_VERSION,
-      "website", "https://abyz.me.uk/rpi/pigpio/piscope.html",
+      "website", "http://abyz.me.uk/rpi/pigpio/piscope.html",
       "website-label", "piscope",
       "comments", "A digital waveform viewer for the Raspberry",
       NULL
@@ -2995,21 +3018,30 @@ void main_menu_help_about_activate
 
 void main_tb_connect_toggled(GtkToggleToolButton * button, gpointer user_data)
 {
+   char msg[64];
    if (gtk_toggle_tool_button_get_active(button))
    {
-      pigpioConnect();
+      pigpioConnect(); // can fail
 
-      gtk_tool_button_set_icon_name(GTK_TOOL_BUTTON(button), "gtk-disconnect");
-      gtk_tool_button_set_label(GTK_TOOL_BUTTON(button), "Disconnect");
-      gtk_widget_set_tooltip_text(GTK_WIDGET(button), "Disconnect from pigpio");
+      if (gPigConnected)
+      {
+         gtk_tool_button_set_icon_name(GTK_TOOL_BUTTON(button), "gtk-disconnect");
+         gtk_tool_button_set_label(GTK_TOOL_BUTTON(button), "Disconnect");
+         snprintf(msg, sizeof(msg), "Disconnect from pigpio at %s",
+            gtk_entry_get_text(GTK_ENTRY(gCmdsPigpioAddr)));
+      
+         gtk_widget_set_tooltip_text(GTK_WIDGET(button), msg);
+      }
    }
    else
    {
-      pigpioDisconnect();
+      pigpioDisconnect(); // can't fail
 
       gtk_tool_button_set_icon_name(GTK_TOOL_BUTTON(button), "gtk-connect");
       gtk_tool_button_set_label(GTK_TOOL_BUTTON(button), "Connect");
-      gtk_widget_set_tooltip_text(GTK_WIDGET(button), "Connect to pigpio");
+      snprintf(msg, sizeof(msg), "Connect to pigpio at %s",
+         gtk_entry_get_text(GTK_ENTRY(gCmdsPigpioAddr)));
+      gtk_widget_set_tooltip_text(GTK_WIDGET(button), msg);
    }
 }
 
@@ -3329,37 +3361,22 @@ gboolean main_key_press_event(
 
 void main_util_setWindowTitle()
 {
-   char *addrStr = getenv(PI_ENVADDR);
-   char *portStr = getenv(PI_ENVPORT);
-   char *title = "piscope (http://abyz.co.uk/rpi/pigpio/piscope.html)";
-   gboolean addrValid = addrStr && strlen(addrStr);
-   gboolean portValid = portStr && strlen(portStr);
+   char *title = "piscope (http://abyz.me.uk/rpi/pigpio/piscope.html)";
+   char buf[128];
 
-   if (addrValid || portValid)
+   if (gPigConnected)
    {
-       char buf[400];
-       strncpy(buf, title, sizeof(buf));
-       strncat(buf, " - [USING ENV VARS: ", sizeof(buf)-strlen(buf));
-       if (addrValid)
-       {
-           strncat(buf, PI_ENVADDR, sizeof(buf)-strlen(buf));
-           strncat(buf, "=", sizeof(buf)-strlen(buf));
-           strncat(buf, addrStr, sizeof(buf)-strlen(buf));
-           if(portValid)
-               strncat(buf, ", ", sizeof(buf)-strlen(buf));
-       }
-
-       if (portValid)
-       {
-           strncat(buf, PI_ENVPORT, sizeof(buf)-strlen(buf));
-           strncat(buf, "=", sizeof(buf)-strlen(buf));
-           strncat(buf, portStr, sizeof(buf)-strlen(buf));
-       }
-       strncat(buf, "]", sizeof(buf)-strlen(buf));
-       title = buf;
+      snprintf(buf, sizeof(buf), "%s   [%s:%s]",
+         title,
+         gtk_entry_get_text(GTK_ENTRY(gCmdsPigpioAddr)),
+         gtk_entry_get_text(GTK_ENTRY(gCmdsPigpioPort)));
+   }
+   else
+   {
+      snprintf(buf, sizeof(buf), "%s", title);
    }
 
-   gtk_window_set_title(GTK_WINDOW(gMain), title);
+   gtk_window_set_title(GTK_WINDOW(gMain), buf);
 }
 /* MAIN ------------------------------------------------------------------- */
 
@@ -3507,8 +3524,6 @@ int main(int argc, char *argv[])
    }
 
    pigpioSetAddr();
-
-   main_util_setWindowTitle();
 
    /* set a minimum size */
 

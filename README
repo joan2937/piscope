@@ -10,8 +10,7 @@ cd PISCOPE
 
 # To utilise a pre-built executable use one of the following make commands
 
-make hf     # hard float to run on a hard float Pi (and Pi 2)
-make sf     # soft float to run on a soft float Pi
+make hf     # to run on a Pi
 make x86_64 # to run on a 64 bit Linux PC
 
 # To build the executable from source
@@ -22,7 +21,7 @@ make x86_64 # to run on a 64 bit Linux PC
 
 sudo apt-get install gtk+-3.0 # may take a long time
 
-On Debian 9 (Stretch):
+# On Debian 9 (Stretch):
 
 sudo apt-get install libgtk-3-dev
 
@@ -38,11 +37,11 @@ make install
 
 # To run you need the pigpio daemon
 
-wget https://abyz.me.uk/rpi/pigpio/pigpio.zip
-unzip pigpio.zip
-cd PIGPIO
+wget https://github.com/joan2937/pigpio/archive/master.zip
+unzip master.zip
+cd pigpio-master
 make
-make install
+sudo make install
 
 # On the Pi
 
@@ -50,7 +49,8 @@ sudo pigpiod # launch the pigpio daemon
 
 # If running piscope on another machine you have 2 ways to connect:
 
-1) Set the remote address via environment variables BEFORE launching piscope:
+# 1) Set the remote address via environment variables BEFORE launching piscope
+
   export PIGPIO_ADDR=host # where host is the Pi's hostname
 
   # or
@@ -61,8 +61,10 @@ sudo pigpiod # launch the pigpio daemon
 
   piscope &
 
-2) Set the remote address in the preferences dialog
+# 2) Set the remote address in the preferences dialog
+
   piscope &
 
   # then open the preferences dialog and set Pi's hostname/address
-  # (Note: if set, the PIGPIO_ADDR environment variable takes always the precedence)
+  # Note: if set, the PIGPIO_ADDR environment variable takes precedence
+
